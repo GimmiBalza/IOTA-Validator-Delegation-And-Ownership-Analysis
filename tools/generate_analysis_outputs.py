@@ -4,7 +4,7 @@ from analysis_outputs.common import configure_plots, export_core_tables
 from analysis_outputs.gbmt_export import export_delegator_gbmt_long
 from analysis_outputs.delegator_actions_sequence import plot_delegator_action_sequence
 from analysis_outputs.delegator_frequency import plot_delegator_retention_all_time
-from analysis_outputs.fee_change_event_timeline import plot_fee_change_event_timeline
+from analysis_outputs.fee_change_event_timeline import plot_fee_change_amount_timeline, plot_fee_change_event_timeline
 from analysis_outputs.fee_distribution import plot_fee_distribution
 from analysis_outputs.fee_vs_delegations import plot_fee_vs_delegations_top_validators
 from analysis_outputs.fee_vs_voting_power import plot_fee_vs_voting_power_top_validators
@@ -28,6 +28,7 @@ def generate_all_outputs():
     plot_delegator_action_sequence()
     plot_top_pool_delegators()
     plot_fee_change_event_timeline()
+    plot_fee_change_amount_timeline()
     export_delegator_gbmt_long()
     print("Tutti gli output sono stati salvati.")
 

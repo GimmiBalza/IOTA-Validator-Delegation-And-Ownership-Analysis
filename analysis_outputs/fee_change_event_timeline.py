@@ -5,9 +5,12 @@ import seaborn as sns
 from analysis_outputs.common import DATA_DIR, get_connection, save_figure, short_address
 
 
-def plot_fee_change_event_timeline(window=10):
-    """Stake/unstake activity around the largest fee increases and decreases."""
-    print("Generazione Grafico 10: Eventi attorno ai maggiori cambi fee...")
+EVENT_TYPES = ["Stake", "Unstake"]
+EVENT_COLORS = {"Stake": "#2a9d8f", "Unstake": "#e76f51"}
+
+
+def fetch_fee_change_activity(window=50):
+    """Return activity for the largest fee changes from event epoch to +window epochs."""
     query = """
         WITH fee_actions AS (
             SELECT
@@ -47,12 +50,13 @@ def plot_fee_change_event_timeline(window=10):
                 s.fee_delta,
                 e.epoch_id AS activity_epoch,
                 e.event_type,
-                COUNT(*) AS event_count
+                COUNT(e.event_id) AS event_count,
+                COALESCE(SUM(e.staked_amount), 0) AS event_amount
             FROM selected s
             LEFT JOIN delegation_events e
               ON e.validator_address = s.validator_address
              AND e.delegator_address != e.validator_address
-             AND e.epoch_id BETWEEN s.epoch_id - %s AND s.epoch_id + %s
+             AND e.epoch_id BETWEEN s.epoch_id AND s.epoch_id + %s
              AND e.event_type IN ('Stake', 'Unstake')
             GROUP BY
                 s.change_group, s.rank_in_group, s.validator_address, s.epoch_id,
@@ -60,22 +64,14 @@ def plot_fee_change_event_timeline(window=10):
         )
         SELECT *
         FROM activity
-        WHERE activity_epoch IS NOT NULL
         ORDER BY change_group, rank_in_group, activity_epoch, event_type;
     """
     with get_connection() as conn:
-        df = pd.read_sql_query(query, conn, params=(window, window))
+        df = pd.read_sql_query(query, conn, params=(window,))
     if df.empty:
-        return
-
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(DATA_DIR / "fee_change_event_timeline.csv", index=False)
+        return df
 
     df["relative_epoch"] = df["activity_epoch"] - df["change_epoch"]
-    df["signed_count"] = df.apply(
-        lambda row: row["event_count"] if row["event_type"] == "Stake" else -row["event_count"],
-        axis=1,
-    )
     df["panel"] = df.apply(
         lambda row: (
             f"{row['change_group']} {int(row['rank_in_group'])}: {short_address(row['validator_address'])}\n"
@@ -83,18 +79,23 @@ def plot_fee_change_event_timeline(window=10):
         ),
         axis=1,
     )
+    return df
 
-    panel_order = (
+
+def panel_order_for(df):
+    return (
         df[["change_group", "rank_in_group", "panel"]]
         .drop_duplicates()
         .sort_values(["change_group", "rank_in_group"], ascending=[False, True])["panel"]
         .tolist()
     )
 
-    relative_epochs = list(range(-window, window + 1))
-    event_types = ["Stake", "Unstake"]
+
+def complete_relative_epoch_grid(df, value_column, window):
+    panel_order = panel_order_for(df)
+    relative_epochs = list(range(0, window + 1))
     complete_index = pd.MultiIndex.from_product(
-        [panel_order, relative_epochs, event_types],
+        [panel_order, relative_epochs, EVENT_TYPES],
         names=["panel", "relative_epoch", "event_type"],
     )
     complete_df = (
@@ -102,30 +103,83 @@ def plot_fee_change_event_timeline(window=10):
         .reindex(complete_index)
         .reset_index()
     )
-    complete_df["signed_count"] = complete_df["signed_count"].fillna(0)
+    complete_df[value_column] = complete_df[value_column].fillna(0)
     complete_df["relative_epoch_label"] = complete_df["relative_epoch"].astype(str)
-    epoch_labels = [str(value) for value in relative_epochs]
+    return complete_df, panel_order, [str(value) for value in relative_epochs]
 
-    g = sns.FacetGrid(complete_df, col="panel", col_wrap=2, col_order=panel_order, height=3.2, aspect=1.7, sharey=False)
+
+def draw_fee_change_facet_bars(df, value_column, output_filename, title, ylabel, window):
+    complete_df, panel_order, epoch_labels = complete_relative_epoch_grid(df, value_column, window)
+    g = sns.FacetGrid(complete_df, col="panel", col_wrap=2, col_order=panel_order, height=3.2, aspect=1.85, sharey=False)
     g.map_dataframe(
         sns.barplot,
         x="relative_epoch_label",
-        y="signed_count",
+        y=value_column,
         hue="event_type",
         order=epoch_labels,
-        hue_order=event_types,
-        palette={"Stake": "#2a9d8f", "Unstake": "#e76f51"},
+        hue_order=EVENT_TYPES,
+        palette=EVENT_COLORS,
         dodge=False,
     )
-    g.add_legend(title="Evento")
+    g.add_legend(title="Event")
     for ax in g.axes.flatten():
         ax.axhline(0, color="black", linewidth=0.8)
-        ax.axvline(window, color="#333333", linestyle="--", linewidth=1)
+        ax.axvline(0, color="#333333", linestyle="--", linewidth=1)
         ax.set_xlim(-0.5, len(epoch_labels) - 0.5)
-        ax.set_xlabel("Epoch relativa al cambio fee")
-        ax.set_ylabel("Stake (+) / Unstake (-)")
-        ax.tick_params(axis="x", rotation=45)
-    g.fig.suptitle("Eventi stake/unstake attorno ai maggiori cambi fee", fontsize=16)
+        ax.set_xlabel("Epochs after fee change")
+        ax.set_ylabel(ylabel)
+        tick_positions = list(range(0, len(epoch_labels), 5))
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels([epoch_labels[index] for index in tick_positions], rotation=45)
+    g.fig.suptitle(title, fontsize=16)
     g.fig.tight_layout(rect=(0, 0, 1, 0.96))
-    save_figure("fee_change_event_timeline.png")
+    save_figure(output_filename)
     plt.close(g.fig)
+
+
+def plot_fee_change_event_timeline(window=50):
+    """Stake/unstake event counts for 50 epochs after the largest fee changes."""
+    print("Generazione Grafico 10: Eventi dopo i maggiori cambi fee...")
+    df = fetch_fee_change_activity(window)
+    if df.empty:
+        return
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_csv(DATA_DIR / "fee_change_event_timeline.csv", index=False)
+
+    df["signed_count"] = df.apply(
+        lambda row: row["event_count"] if row["event_type"] == "Stake" else -row["event_count"],
+        axis=1,
+    )
+    draw_fee_change_facet_bars(
+        df,
+        value_column="signed_count",
+        output_filename="fee_change_event_timeline.png",
+        title="Stake/unstake event counts after the largest fee changes",
+        ylabel="Stake events (+) / Unstake events (-)",
+        window=window,
+    )
+
+
+def plot_fee_change_amount_timeline(window=50):
+    """Staked/unstaked IOTA amounts for 50 epochs after the largest fee changes."""
+    print("Generazione Grafico 11: Importi stake/unstake dopo i maggiori cambi fee...")
+    df = fetch_fee_change_activity(window)
+    if df.empty:
+        return
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_csv(DATA_DIR / "fee_change_amount_timeline.csv", index=False)
+
+    df["signed_amount_millions"] = df.apply(
+        lambda row: row["event_amount"] / 1_000_000 if row["event_type"] == "Stake" else -row["event_amount"] / 1_000_000,
+        axis=1,
+    )
+    draw_fee_change_facet_bars(
+        df,
+        value_column="signed_amount_millions",
+        output_filename="fee_change_amount_timeline.png",
+        title="Staked/unstaked IOTA amounts after the largest fee changes",
+        ylabel="Staked IOTA (+) / Unstaked IOTA (-), millions",
+        window=window,
+    )
