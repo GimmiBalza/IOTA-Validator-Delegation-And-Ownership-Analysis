@@ -91,12 +91,29 @@ def plot_fee_change_event_timeline(window=10):
         .tolist()
     )
 
-    g = sns.FacetGrid(df, col="panel", col_wrap=2, col_order=panel_order, height=3.2, aspect=1.7, sharey=False)
+    relative_epochs = list(range(-window, window + 1))
+    event_types = ["Stake", "Unstake"]
+    complete_index = pd.MultiIndex.from_product(
+        [panel_order, relative_epochs, event_types],
+        names=["panel", "relative_epoch", "event_type"],
+    )
+    complete_df = (
+        df.set_index(["panel", "relative_epoch", "event_type"])
+        .reindex(complete_index)
+        .reset_index()
+    )
+    complete_df["signed_count"] = complete_df["signed_count"].fillna(0)
+    complete_df["relative_epoch_label"] = complete_df["relative_epoch"].astype(str)
+    epoch_labels = [str(value) for value in relative_epochs]
+
+    g = sns.FacetGrid(complete_df, col="panel", col_wrap=2, col_order=panel_order, height=3.2, aspect=1.7, sharey=False)
     g.map_dataframe(
         sns.barplot,
-        x="relative_epoch",
+        x="relative_epoch_label",
         y="signed_count",
         hue="event_type",
+        order=epoch_labels,
+        hue_order=event_types,
         palette={"Stake": "#2a9d8f", "Unstake": "#e76f51"},
         dodge=False,
     )
@@ -104,6 +121,7 @@ def plot_fee_change_event_timeline(window=10):
     for ax in g.axes.flatten():
         ax.axhline(0, color="black", linewidth=0.8)
         ax.axvline(window, color="#333333", linestyle="--", linewidth=1)
+        ax.set_xlim(-0.5, len(epoch_labels) - 0.5)
         ax.set_xlabel("Epoch relativa al cambio fee")
         ax.set_ylabel("Stake (+) / Unstake (-)")
         ax.tick_params(axis="x", rotation=45)
