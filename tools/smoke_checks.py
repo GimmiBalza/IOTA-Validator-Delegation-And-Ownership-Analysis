@@ -8,24 +8,44 @@ from iota_stake_ownership.config import DB_PARAMS
 from iota_stake_ownership.schema import ensure_schema
 from tools.generate_analysis_outputs import (
     export_delegator_gbmt_long,
-    plot_latest_validator_stake,
     plot_delegator_action_sequence,
+    plot_delegator_retention_all_time,
+    plot_fee_change_amount_timeline,
     plot_fee_vs_delegations_top_validators,
     plot_fee_vs_voting_power_top_validators,
     plot_fee_change_event_timeline,
+    plot_fee_distribution,
+    plot_fixed_epoch_validator_stakes,
+    plot_latest_validator_stake,
+    plot_stake_and_fee_trends,
     plot_top_pool_delegators,
+    plot_total_staked_iota_by_epoch,
+    plot_validator_stake_gini_index,
     plot_validator_wealth_all,
 )
 
 
 GRAPH_OUTPUTS = [
-    Path("outputs/figures/latest_validator_own_vs_delegated.png"),
-    Path("outputs/figures/validator_wealth_and_delegation_counts.png"),
-    Path("outputs/figures/fee_vs_voting_power_top_validators.png"),
-    Path("outputs/figures/fee_vs_delegations_top_validators.png"),
-    Path("outputs/figures/delegator_action_sequences.png"),
-    Path("outputs/figures/top_pool_delegators_first.png"),
-    Path("outputs/figures/fee_change_event_timeline.png"),
+    Path("outputs/figures/01_validator_stake_epoch_10.png"),
+    Path("outputs/figures/02_validator_stake_epoch_100.png"),
+    Path("outputs/figures/03_validator_stake_epoch_200.png"),
+    Path("outputs/figures/04_latest_validator_own_vs_delegated.png"),
+    Path("outputs/figures/05_validator_wealth_and_delegation_counts.png"),
+    Path("outputs/figures/06_delegator_action_frequency.png"),
+    Path("outputs/figures/07_fee_distribution.png"),
+    Path("outputs/figures/08_stake_fee_migration.png"),
+    Path("outputs/figures/09_fee_vs_voting_power_top_validators.png"),
+    Path("outputs/figures/10_fee_vs_delegations_top_validators.png"),
+    Path("outputs/figures/11_delegator_action_sequences.png"),
+    Path("outputs/figures/12_top_pool_delegators_first.png"),
+    Path("outputs/figures/13_top_pool_delegators_second.png"),
+    Path("outputs/figures/14_top_pool_delegators_third.png"),
+    Path("outputs/figures/15_top_pool_delegators_fourth.png"),
+    Path("outputs/figures/16_top_pool_delegators_fifth.png"),
+    Path("outputs/figures/17_fee_change_event_timeline.png"),
+    Path("outputs/figures/18_fee_change_amount_timeline.png"),
+    Path("outputs/figures/19_validator_stake_gini_index.png"),
+    Path("outputs/figures/20_total_staked_iota_by_epoch.png"),
 ]
 
 
@@ -61,13 +81,20 @@ def check_counts():
 
 def run_graph_smoke():
     before = {path: path.stat().st_mtime if path.exists() else None for path in GRAPH_OUTPUTS}
+    plot_fixed_epoch_validator_stakes()
     plot_latest_validator_stake()
     plot_validator_wealth_all()
+    plot_delegator_retention_all_time()
+    plot_fee_distribution()
+    plot_stake_and_fee_trends()
     plot_fee_vs_voting_power_top_validators()
     plot_fee_vs_delegations_top_validators()
     plot_delegator_action_sequence()
     plot_top_pool_delegators()
     plot_fee_change_event_timeline()
+    plot_fee_change_amount_timeline()
+    plot_validator_stake_gini_index()
+    plot_total_staked_iota_by_epoch()
     export_delegator_gbmt_long()
     after = {path: path.stat().st_mtime if path.exists() else None for path in GRAPH_OUTPUTS}
     return {str(path): after[path] is not None and after[path] != before[path] for path in GRAPH_OUTPUTS}

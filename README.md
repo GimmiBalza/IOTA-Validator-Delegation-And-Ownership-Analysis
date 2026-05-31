@@ -122,6 +122,7 @@ The `outputs/` directory contains generated PNG figures and CSV files. These fil
 |   |-- fee_vs_voting_power.py
 |   |-- gbmt_export.py
 |   |-- latest_validator_stake.py
+|   |-- stake_distribution_timeseries.py
 |   |-- stake_fee_migration.py
 |   |-- top_pool_delegators.py
 |   `-- validator_wealth_delegations.py
@@ -476,20 +477,26 @@ Current figure filenames:
 
 | File | Description |
 |---|---|
-| `latest_validator_own_vs_delegated.png` | Latest-epoch stacked own/delegated stake for all validators |
-| `validator_wealth_and_delegation_counts.png` | Latest-epoch stake plus historical delegation counts |
-| `delegator_action_frequency.png` | Distribution of delegator interaction counts |
-| `fee_distribution.png` | Distribution of nominal/effective fees over recent epochs |
-| `stake_fee_migration.png` | Delegated stake and fee trends for top validators |
-| `fee_vs_voting_power_top_validators.png` | Fee versus voting power for top validators |
-| `fee_vs_delegations_top_validators.png` | Fee versus number of delegation events |
-| `delegator_action_sequences.png` | Action sequence for active multi-validator delegators |
-| `top_pool_delegators_first.png` | Delegator balances for the largest pool |
-| `top_pool_delegators_second.png` | Delegator balances for the second largest pool |
-| `top_pool_delegators_third.png` | Delegator balances for the third largest pool |
-| `top_pool_delegators_fourth.png` | Delegator balances for the fourth largest pool |
-| `top_pool_delegators_fifth.png` | Delegator balances for the fifth largest pool |
-| `fee_change_event_timeline.png` | Stake/unstake activity around the largest fee changes |
+| `01_validator_stake_epoch_10.png` | Epoch 10 stacked own/delegated stake for all validators |
+| `02_validator_stake_epoch_100.png` | Epoch 100 stacked own/delegated stake for all validators |
+| `03_validator_stake_epoch_200.png` | Epoch 200 stacked own/delegated stake for all validators |
+| `04_latest_validator_own_vs_delegated.png` | Latest-epoch stacked own/delegated stake for all validators |
+| `05_validator_wealth_and_delegation_counts.png` | Latest-epoch stake plus historical delegation counts |
+| `06_delegator_action_frequency.png` | Distribution of delegator interaction counts |
+| `07_fee_distribution.png` | Distribution of nominal/effective fees over recent epochs |
+| `08_stake_fee_migration.png` | Delegated stake and fee trends for top validators |
+| `09_fee_vs_voting_power_top_validators.png` | Fee versus voting power for top validators |
+| `10_fee_vs_delegations_top_validators.png` | Fee versus number of delegation events |
+| `11_delegator_action_sequences.png` | Action sequence for active multi-validator delegators |
+| `12_top_pool_delegators_first.png` | Delegator balances for the largest pool |
+| `13_top_pool_delegators_second.png` | Delegator balances for the second largest pool |
+| `14_top_pool_delegators_third.png` | Delegator balances for the third largest pool |
+| `15_top_pool_delegators_fourth.png` | Delegator balances for the fourth largest pool |
+| `16_top_pool_delegators_fifth.png` | Delegator balances for the fifth largest pool |
+| `17_fee_change_event_timeline.png` | Stake/unstake activity counts around the largest fee changes, with voting power context |
+| `18_fee_change_amount_timeline.png` | Staked/unstaked IOTA amounts around the largest fee changes, with voting power context |
+| `19_validator_stake_gini_index.png` | Gini index of total staked IOTA among validators from epoch 0 to latest |
+| `20_total_staked_iota_by_epoch.png` | Total staked IOTA from epoch 0 to latest |
 
 Generated CSV files are stored in:
 
@@ -507,6 +514,9 @@ Current CSV filenames:
 | `delegator_trajectory_long.csv` | Long-format delegator trajectory dataset for GBMT/R workflows |
 | `top_pool_delegator_balances.csv` | Net delegator balances for top pools |
 | `fee_change_event_timeline.csv` | Data behind the fee-change event timeline graph |
+| `fee_change_amount_timeline.csv` | Data behind the fee-change amount timeline graph |
+| `validator_total_stake_gini_by_epoch.csv` | Per-epoch Gini index of total validator stake |
+| `total_staked_iota_by_epoch.csv` | Per-epoch total staked IOTA across validators |
 
 ## Source File Reference
 
@@ -629,46 +639,55 @@ Exports `delegator_trajectory_long.csv`, a long-format dataset suitable for late
 
 #### `analysis_outputs/latest_validator_stake.py`
 
-Generates `latest_validator_own_vs_delegated.png`, a stacked latest-epoch own/delegated stake chart for all validators.
+Generates the numbered validator stake composition charts:
+
+```text
+01_validator_stake_epoch_10.png
+02_validator_stake_epoch_100.png
+03_validator_stake_epoch_200.png
+04_latest_validator_own_vs_delegated.png
+```
+
+Each chart uses the same stacked own/delegated stake logic and only changes the selected epoch.
 
 #### `analysis_outputs/validator_wealth_delegations.py`
 
-Generates `validator_wealth_and_delegation_counts.png`, combining stake composition and historical received delegation count.
+Generates `05_validator_wealth_and_delegation_counts.png`, combining stake composition and historical received delegation count.
 
 #### `analysis_outputs/delegator_frequency.py`
 
-Generates `delegator_action_frequency.png`, showing how many delegators interacted once, twice, and so on.
+Generates `06_delegator_action_frequency.png`, showing how many delegators interacted once, twice, and so on.
 
 #### `analysis_outputs/fee_distribution.py`
 
-Generates `fee_distribution.png`, showing recent nominal and effective fee distributions.
+Generates `07_fee_distribution.png`, showing recent nominal and effective fee distributions.
 
 #### `analysis_outputs/stake_fee_migration.py`
 
-Generates `stake_fee_migration.png`, showing delegated stake and fee trends for top validators.
+Generates `08_stake_fee_migration.png`, showing delegated stake and fee trends for top validators.
 
 #### `analysis_outputs/fee_vs_voting_power.py`
 
-Generates `fee_vs_voting_power_top_validators.png`, comparing fees and voting power over time.
+Generates `09_fee_vs_voting_power_top_validators.png`, comparing fees and voting power over time.
 
 #### `analysis_outputs/fee_vs_delegations.py`
 
-Generates `fee_vs_delegations_top_validators.png`, comparing fee changes with new stake event counts.
+Generates `10_fee_vs_delegations_top_validators.png`, comparing fee changes with new stake event counts.
 
 #### `analysis_outputs/delegator_actions_sequence.py`
 
-Generates `delegator_action_sequences.png`, showing selected delegators' stake/unstake movement across validators.
+Generates `11_delegator_action_sequences.png`, showing selected delegators' stake/unstake movement across validators.
 
 #### `analysis_outputs/top_pool_delegators.py`
 
 Generates five top-pool delegator charts:
 
 ```text
-top_pool_delegators_first.png
-top_pool_delegators_second.png
-top_pool_delegators_third.png
-top_pool_delegators_fourth.png
-top_pool_delegators_fifth.png
+12_top_pool_delegators_first.png
+13_top_pool_delegators_second.png
+14_top_pool_delegators_third.png
+15_top_pool_delegators_fourth.png
+16_top_pool_delegators_fifth.png
 ```
 
 Also exports:
@@ -679,12 +698,31 @@ outputs/data/top_pool_delegator_balances.csv
 
 #### `analysis_outputs/fee_change_event_timeline.py`
 
-Generates `fee_change_event_timeline.png`, a faceted timeline of stake and unstake counts around the largest fee increases and decreases.
+Generates `17_fee_change_event_timeline.png`, a faceted timeline of stake and unstake counts around the largest fee increases and decreases.
+
+Generates `18_fee_change_amount_timeline.png`, a faceted timeline of staked and unstaked IOTA amounts around the same fee changes.
 
 Also exports:
 
 ```text
 outputs/data/fee_change_event_timeline.csv
+outputs/data/fee_change_amount_timeline.csv
+```
+
+#### `analysis_outputs/stake_distribution_timeseries.py`
+
+Generates the two network-level stake distribution charts:
+
+```text
+19_validator_stake_gini_index.png
+20_total_staked_iota_by_epoch.png
+```
+
+It also exports:
+
+```text
+outputs/data/validator_total_stake_gini_by_epoch.csv
+outputs/data/total_staked_iota_by_epoch.csv
 ```
 
 ### `tests/`

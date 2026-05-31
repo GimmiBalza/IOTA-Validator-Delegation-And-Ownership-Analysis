@@ -5,11 +5,12 @@ import pandas as pd
 from analysis_outputs.common import DATA_DIR, get_connection, save_figure, short_address
 
 POOL_RANK_NAMES = ["first", "second", "third", "fourth", "fifth"]
+POOL_RANK_OUTPUT_NUMBERS = [12, 13, 14, 15, 16]
 
 
 def plot_top_pool_delegators():
     """Delegator balances for each of the top 5 pools in the latest epoch."""
-    print("Generazione Grafico 9: Delegatori top pool...")
+    print("Generating graphs 12-16: top pool delegators...")
     query = """
         WITH latest_top5 AS (
             SELECT validator_address, pool_id, total_stake
@@ -74,5 +75,6 @@ def plot_top_pool_delegators():
         ax.grid(True, axis="y", color="#d0d0d0")
         plt.tight_layout()
         rank_name = POOL_RANK_NAMES[rank - 1] if rank <= len(POOL_RANK_NAMES) else str(rank)
-        save_figure(f"top_pool_delegators_{rank_name}.png")
+        output_number = POOL_RANK_OUTPUT_NUMBERS[rank - 1] if rank <= len(POOL_RANK_OUTPUT_NUMBERS) else rank + 11
+        save_figure(f"{output_number:02d}_top_pool_delegators_{rank_name}.png")
         plt.close(fig)

@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from matplotlib.patches import Patch
 
 from analysis_outputs.common import DATA_DIR, get_connection, save_figure, short_address
 
@@ -149,42 +150,50 @@ def complete_relative_epoch_grid(df, value_column, window):
         .reset_index()
     )
     complete_df[value_column] = complete_df[value_column].fillna(0)
-    complete_df["relative_epoch_label"] = complete_df["relative_epoch"].astype(str)
-    return complete_df, panel_order, [str(value) for value in relative_epochs]
+    return complete_df, panel_order, relative_epochs
+
+
+def draw_relative_epoch_bars(data, value_column, **kwargs):
+    ax = plt.gca()
+    for event_type in EVENT_TYPES:
+        subset = data[data["event_type"] == event_type].sort_values("relative_epoch")
+        ax.bar(
+            subset["relative_epoch"],
+            subset[value_column],
+            width=0.9,
+            color=EVENT_COLORS[event_type],
+            alpha=0.95,
+            label=event_type,
+        )
 
 
 def draw_fee_change_facet_bars(df, value_column, output_filename, title, ylabel, window):
-    complete_df, panel_order, epoch_labels = complete_relative_epoch_grid(df, value_column, window)
+    complete_df, panel_order, relative_epochs = complete_relative_epoch_grid(df, value_column, window)
     voting_power_df = fetch_voting_power_context(df, window)
     g = sns.FacetGrid(complete_df, col="panel", col_wrap=2, col_order=panel_order, height=3.2, aspect=1.85, sharey=False)
+    g.set_titles("{col_name}")
     g.map_dataframe(
-        sns.barplot,
-        x="relative_epoch_label",
-        y=value_column,
-        hue="event_type",
-        order=epoch_labels,
-        hue_order=EVENT_TYPES,
-        palette=EVENT_COLORS,
-        dodge=False,
+        draw_relative_epoch_bars,
+        value_column=value_column,
     )
-    g.add_legend(title="Event")
+    legend_handles = [Patch(facecolor=EVENT_COLORS[event_type], label=event_type) for event_type in EVENT_TYPES]
+    g.fig.legend(handles=legend_handles, title="Event", loc="upper right", bbox_to_anchor=(0.985, 0.985))
     for ax in g.axes.flatten():
-        panel = ax.get_title().replace("panel = ", "")
+        panel = ax.get_title()
         ax.axhline(0, color="black", linewidth=0.8)
-        ax.axvline(window, color="#333333", linestyle="--", linewidth=1)
-        ax.set_xlim(-0.5, len(epoch_labels) - 0.5)
+        ax.axvline(0, color="#333333", linestyle="--", linewidth=1.1)
+        ax.set_xlim(-window - 0.5, window + 0.5)
         ax.set_xlabel("Epochs relative to fee change")
-        ax.set_ylabel(ylabel)
-        tick_positions = list(range(0, len(epoch_labels), 10))
+        ax.set_ylabel("")
+        tick_positions = list(range(-window, window + 1, 10))
         ax.set_xticks(tick_positions)
-        ax.set_xticklabels([epoch_labels[index] for index in tick_positions], rotation=45)
+        ax.set_xticklabels([str(value) for value in tick_positions], rotation=45)
 
         panel_voting_power = voting_power_df[voting_power_df["panel"] == panel].sort_values("relative_epoch")
         if not panel_voting_power.empty:
             ax2 = ax.twinx()
-            x_positions = panel_voting_power["relative_epoch"] + window
             ax2.plot(
-                x_positions,
+                panel_voting_power["relative_epoch"],
                 panel_voting_power["voting_power"],
                 color="#222222",
                 linewidth=1.8,
@@ -192,19 +201,20 @@ def draw_fee_change_facet_bars(df, value_column, output_filename, title, ylabel,
                 label="Voting power",
                 zorder=0,
             )
-            ax2.set_ylabel("Voting power (%)", color="#222222")
+            ax2.set_ylabel("VP (%)", color="#222222")
             ax2.tick_params(axis="y", colors="#222222")
             upper = panel_voting_power["voting_power"].max()
             ax2.set_ylim(0, max(1, upper * 1.2))
     g.fig.suptitle(title, fontsize=16)
-    g.fig.tight_layout(rect=(0, 0, 1, 0.96))
+    g.fig.text(0.015, 0.5, ylabel, rotation="vertical", va="center", fontsize=11)
+    g.fig.tight_layout(rect=(0.035, 0, 0.94, 0.96))
     save_figure(output_filename)
     plt.close(g.fig)
 
 
 def plot_fee_change_event_timeline(window=50):
     """Stake/unstake event counts for 50 epochs before and after the largest fee changes."""
-    print("Generazione Grafico 10: Eventi prima e dopo i maggiori cambi fee...")
+    print("Generating graph 17: fee-change stake/unstake event timeline...")
     df = fetch_fee_change_activity(window)
     if df.empty:
         return
@@ -219,16 +229,16 @@ def plot_fee_change_event_timeline(window=50):
     draw_fee_change_facet_bars(
         df,
         value_column="signed_count",
-        output_filename="fee_change_event_timeline.png",
+        output_filename="17_fee_change_event_timeline.png",
         title="Stake/unstake event counts before and after the largest fee changes",
-        ylabel="Stake events (+) / Unstake events (-)",
+        ylabel="Stake events (+) / unstake events (-)",
         window=window,
     )
 
 
 def plot_fee_change_amount_timeline(window=50):
     """Staked/unstaked IOTA amounts for 50 epochs before and after the largest fee changes."""
-    print("Generazione Grafico 11: Importi stake/unstake prima e dopo i maggiori cambi fee...")
+    print("Generating graph 18: fee-change staked/unstaked amount timeline...")
     df = fetch_fee_change_activity(window)
     if df.empty:
         return
@@ -243,8 +253,8 @@ def plot_fee_change_amount_timeline(window=50):
     draw_fee_change_facet_bars(
         df,
         value_column="signed_amount_millions",
-        output_filename="fee_change_amount_timeline.png",
+        output_filename="18_fee_change_amount_timeline.png",
         title="Staked/unstaked IOTA amounts before and after the largest fee changes",
-        ylabel="Staked IOTA (+) / Unstaked IOTA (-), millions",
+        ylabel="Staked IOTA (+) / unstaked IOTA (-), millions",
         window=window,
     )

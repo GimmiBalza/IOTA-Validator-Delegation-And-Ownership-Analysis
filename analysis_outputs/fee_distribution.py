@@ -8,7 +8,7 @@ from analysis_outputs.common import get_connection, save_figure
 
 def plot_fee_distribution():
     """Average fee distribution over the last 50 epochs."""
-    print("Generazione Grafico 4: Distribuzione fee...")
+    print("Generating graph 07: fee distribution...")
     query = """
         SELECT epoch_id, applied_fee, effective_fee
         FROM validator_snapshots
@@ -58,5 +58,5 @@ def plot_fee_distribution():
     ax.set_xlim(0, max_x)
 
     plt.tight_layout()
-    save_figure("fee_distribution.png")
+    save_figure("07_fee_distribution.png")
     plt.close(fig)

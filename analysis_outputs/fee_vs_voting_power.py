@@ -8,7 +8,7 @@ from analysis_outputs.stake_fee_migration import sql_in
 
 def plot_fee_vs_voting_power_top_validators():
     """Effective fee vs voting power for the top 5 validators."""
-    print("Generazione Grafico 6: Fee vs voting power top 5...")
+    print("Generating graph 09: fee vs voting power for top validators...")
     with get_connection() as conn:
         top_vals_df = pd.read_sql_query(
             """
@@ -56,5 +56,5 @@ def plot_fee_vs_voting_power_top_validators():
     ax1.legend(lines1 + lines2, labels1 + labels2, bbox_to_anchor=(1.05, 1), loc="upper left")
 
     plt.tight_layout()
-    save_figure("fee_vs_voting_power_top_validators.png")
+    save_figure("09_fee_vs_voting_power_top_validators.png")
     plt.close(fig)

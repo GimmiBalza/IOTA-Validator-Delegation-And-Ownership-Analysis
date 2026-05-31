@@ -11,7 +11,7 @@ def sql_in(values):
 
 def plot_stake_and_fee_trends():
     """Delegated stake and effective fee trends for the top 5 validators."""
-    print("Generazione Grafico 5: Trend stake e fee top 5...")
+    print("Generating graph 08: stake and fee trends for top validators...")
     with get_connection() as conn:
         top_vals_df = pd.read_sql_query(
             """
@@ -67,5 +67,5 @@ def plot_stake_and_fee_trends():
     ax1.legend(lines1 + lines2, labels1 + labels2, bbox_to_anchor=(1.05, 1), loc="upper left")
 
     plt.tight_layout()
-    save_figure("stake_fee_migration.png")
+    save_figure("08_stake_fee_migration.png")
     plt.close(fig)

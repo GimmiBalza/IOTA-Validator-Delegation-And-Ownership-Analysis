@@ -7,7 +7,7 @@ from analysis_outputs.common import get_connection, save_figure, short_address
 
 def plot_fee_vs_delegations_top_validators():
     """Effective fee vs number of stake events for the top 5 validators."""
-    print("Generazione Grafico 7: Fee vs numero deleghe top 5...")
+    print("Generating graph 10: fee vs delegation count for top validators...")
     query = """
         WITH top5 AS (
             SELECT validator_address
@@ -69,5 +69,5 @@ def plot_fee_vs_delegations_top_validators():
     ax1.legend(lines1 + lines2, labels1 + labels2, bbox_to_anchor=(1.05, 1), loc="upper left")
 
     plt.tight_layout()
-    save_figure("fee_vs_delegations_top_validators.png")
+    save_figure("10_fee_vs_delegations_top_validators.png")
     plt.close(fig)

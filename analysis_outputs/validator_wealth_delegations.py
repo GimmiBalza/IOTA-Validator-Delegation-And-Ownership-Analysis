@@ -7,7 +7,7 @@ from analysis_outputs.common import get_connection, save_figure
 
 def plot_validator_wealth_all():
     """Stake validators and historical received delegation counts."""
-    print("Generazione Grafico 2: Ricchezza e numero deleghe...")
+    print("Generating graph 05: validator wealth and delegation counts...")
     query = """
         WITH max_epoch AS (
             SELECT MAX(epoch_id) AS max_e FROM validator_snapshots
@@ -63,5 +63,5 @@ def plot_validator_wealth_all():
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     plt.tight_layout()
-    save_figure("validator_wealth_and_delegation_counts.png")
+    save_figure("05_validator_wealth_and_delegation_counts.png")
     plt.close(fig)

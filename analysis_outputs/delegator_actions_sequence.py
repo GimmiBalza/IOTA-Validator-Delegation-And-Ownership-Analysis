@@ -13,7 +13,7 @@ def tuple_sql(values):
 
 def plot_delegator_action_sequence():
     """Action sequence for three active delegators."""
-    print("Generazione Grafico 8: Sequenza azioni delegatori...")
+    print("Generating graph 11: delegator action sequences...")
     query_candidates = """
         SELECT delegator_address, array_agg(DISTINCT validator_address) AS val_list
         FROM delegation_events
@@ -88,5 +88,5 @@ def plot_delegator_action_sequence():
 
     axes[-1].set_xlabel("Epoca in cui e avvenuta l'azione")
     plt.tight_layout()
-    save_figure("delegator_action_sequences.png")
+    save_figure("11_delegator_action_sequences.png")
     plt.close(fig)

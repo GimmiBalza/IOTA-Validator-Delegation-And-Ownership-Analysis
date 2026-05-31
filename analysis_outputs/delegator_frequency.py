@@ -8,7 +8,7 @@ from analysis_outputs.common import get_connection, save_figure
 
 def plot_delegator_retention_all_time():
     """Delegator action frequency over the full history."""
-    print("Generazione Grafico 3: Frequenza azioni delegatori...")
+    print("Generating graph 06: delegator action frequency...")
     query = """
         SELECT delegator_address, COUNT(*) AS total_actions
         FROM delegation_events
@@ -31,5 +31,5 @@ def plot_delegator_retention_all_time():
     ax.set_title("Frequenza di Interazione dei Delegatori (Tutta la Storia)", fontsize=16)
 
     plt.tight_layout()
-    save_figure("delegator_action_frequency.png")
+    save_figure("06_delegator_action_frequency.png")
     plt.close(fig)
