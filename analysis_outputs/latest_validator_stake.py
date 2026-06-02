@@ -46,10 +46,10 @@ def draw_validator_stake_chart(df, epoch_id, output_filename):
     delegated_m = df["delegated_stake"].fillna(0) / 1_000_000
 
     fig, ax = plt.subplots(figsize=(20, 10))
-    ax.bar(x, own_m, label="Own Stake", color="#2a9d8f", width=0.62)
+    ax.bar(x, own_m, label="Validator-Owned Stake", color="#2a9d8f", width=0.62)
     ax.bar(x, delegated_m, bottom=own_m, label="Delegated Stake", color="#e9c46a", width=0.62)
 
-    ax.set_title(f"Validator Wealth: Own vs Delegated Stake (Epoch {epoch_id})", fontsize=18)
+    ax.set_title(f"Validator Pool Stake: Validator-Owned vs Delegated Stake (Epoch {epoch_id})", fontsize=18)
     ax.set_ylabel("Millions of IOTA")
     ax.set_xticks(x)
     ax.set_xticklabels(df["short_addr"], rotation=90, fontsize=8)
