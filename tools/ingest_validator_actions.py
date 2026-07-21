@@ -7,6 +7,7 @@ import _bootstrap
 from iota_stake_ownership.config import DB_PARAMS
 from iota_stake_ownership.graphql_client import graphql_request
 from iota_stake_ownership.schema import ensure_schema
+from iota_stake_ownership.validator_identity import MIN_COMMISSION_ACTIVATION_EPOCH
 
 
 QUERY_FORWARD = """
@@ -106,10 +107,26 @@ def process_action_node(cursor_db, node, last_known_fees):
         UPDATE validator_snapshots
         SET global_tallying_score = %s,
             applied_fee = %s,
-            effective_fee = GREATEST(%s, COALESCE(voting_power, 0))
+            effective_fee = CASE
+                WHEN epoch_id < %s THEN %s
+                ELSE GREATEST(%s, COALESCE(voting_power, 0))
+            END,
+            effective_fee_rule = CASE
+                WHEN epoch_id < %s THEN 'nominal'
+                ELSE 'voting_power_floor'
+            END
         WHERE epoch_id = %s AND validator_address = %s;
         """,
-        (global_score, commission_pct, commission_pct, epoch_id, target_validator),
+        (
+            global_score,
+            commission_pct,
+            MIN_COMMISSION_ACTIVATION_EPOCH,
+            commission_pct,
+            commission_pct,
+            MIN_COMMISSION_ACTIVATION_EPOCH,
+            epoch_id,
+            target_validator,
+        ),
     )
 
     if target_validator not in last_known_fees:

@@ -2,11 +2,12 @@
 
 This repository builds a PostgreSQL dataset for IOTA validator activity and produces analysis graphs about validator stake, delegator behavior, fees, and fee-change reactions.
 
-The project has three main goals:
+The project has four main goals:
 
 1. Ingest validator snapshots, delegation events, and validator action data from public IOTA endpoints.
 2. Reconstruct validator-owned stake through strict ownership of `StakedIota` and `TimelockedStakedIota` objects.
-3. Export clean CSV datasets for downstream analysis.
+3. Reconstruct validator identities across multiple addresses and aggregate their stake, voting power, and fees.
+4. Export clean CSV datasets for downstream analysis.
 
 ## Current Dataset Status
 
@@ -17,6 +18,8 @@ Current local table coverage:
 | Table | Rows | Epoch Range |
 |---|---:|---|
 | `validator_snapshots` | 24709 | 0-386 |
+| `validator_identities` | 75 | 0-386 |
+| `validator_group_snapshots` | 23231 | 0-386 |
 | `delegation_events` | 178530 | 0-386 |
 | `validator_actions` | 80 | 4-381 |
 
@@ -25,6 +28,10 @@ Integrity checks after reconstruction:
 ```text
 negative delegated stake rows: 0
 ownership reconciliation mismatches: 0
+grouped ownership reconciliation mismatches: 0
+grouped/address epoch total mismatches: 0
+validator identity coverage mismatches: 0
+effective-fee policy mismatches: 0
 missing ownership rows: 0
 duplicate delegation event ids: 0
 ```
@@ -37,6 +44,12 @@ Official IOTA endpoint documentation:
 
 ```text
 https://docs.iota.org/developer/network-overview
+```
+
+Minimum-commission policy discussion:
+
+```text
+https://github.com/iotaledger/IIPs/discussions/29
 ```
 
 Endpoints used by the project:
@@ -98,6 +111,10 @@ The `tools/` directory contains command-line scripts that ingest raw or semi-raw
 
 Ownership reconstruction writes the final `own_stake` and `delegated_stake` values into `validator_snapshots`. It uses object ownership first and event-based strict self-delegation only as a fallback.
 
+### Validator Identity Reconstruction
+
+Validator names collected at every epoch are used to map multiple addresses to one operator identity. A base name is grouped only when at least two distinct addresses use numbered variants such as `PANDABYTE I`/`PANDABYTE II`, `IOTA 1`/`IOTA 2`, or `Kiln0`/`Kiln1`. The complete address-level history remains unchanged in `validator_snapshots`; the separate `validator_group_snapshots` table contains the aggregated history.
+
 ### Analysis Outputs
 
 The `analysis_outputs/` package contains one file per graph plus shared export utilities. This keeps plotting logic easy to read, review, and change.
@@ -125,18 +142,21 @@ The `outputs/` directory contains generated PNG figures and CSV files. These fil
 |   |-- stake_distribution_timeseries.py
 |   |-- stake_fee_migration.py
 |   |-- top_pool_delegators.py
+|   |-- validator_group_analysis.py
 |   `-- validator_wealth_delegations.py
 |-- iota_stake_ownership/
 |   |-- config.py
 |   |-- graphql_client.py
 |   |-- json_rpc_client.py
 |   |-- schema.py
-|   `-- strict_ownership.py
+|   |-- strict_ownership.py
+|   `-- validator_identity.py
 |-- outputs/
 |   |-- data/
 |   `-- figures/
 |-- tests/
-|   `-- test_strict_ownership.py
+|   |-- test_strict_ownership.py
+|   `-- test_validator_identity.py
 `-- tools/
     |-- __init__.py
     |-- _bootstrap.py
@@ -147,6 +167,7 @@ The `outputs/` directory contains generated PNG figures and CSV files. These fil
     |-- ingest_validator_snapshots.py
     |-- ingest_validator_stake_object_history.py
     |-- rebuild_database.py
+    |-- rebuild_validator_groups.py
     |-- reconstruct_ownership.py
     `-- smoke_checks.py
 ```
@@ -169,7 +190,7 @@ IOTA_JSON_RPC_URL    = https://api.mainnet.iota.cafe
 IOTA_INDEXER_RPC_URL = https://indexer.mainnet.iota.cafe
 IOTA_DB_NAME         = IOTA_history
 IOTA_DB_USER         = postgres
-IOTA_DB_PASSWORD     = Calpezta1!
+IOTA_DB_PASSWORD     = password
 IOTA_DB_HOST         = localhost
 IOTA_DB_PORT         = 5432
 ```
@@ -217,15 +238,75 @@ Main columns:
 |---|---|
 | `epoch_id` | IOTA epoch |
 | `validator_address` | Validator address |
+| `validator_name` | Name reported by the validator in that epoch |
 | `voting_power` | Validator voting power percentage |
 | `total_stake` | Total validator pool stake in whole IOTA |
 | `own_stake` | Validator-owned stake in whole IOTA |
 | `delegated_stake` | `total_stake - own_stake` |
-| `applied_fee` | Protocol commission rate |
-| `effective_fee` | Effective fee used in analysis |
+| `applied_fee` | Nominal/configured commission rate |
+| `effective_fee` | Date-aware effective fee used in analysis |
+| `effective_fee_rule` | `nominal` or `voting_power_floor` |
 | `validator_reward` | Reward pool amount in whole IOTA |
 | `global_tallying_score` | Validator performance/report score |
 | `pool_id` | Staking pool object id |
+
+### `validator_identities`
+
+One row per validator address. This is the persistent mapping from an address to its reconstructed operator identity.
+
+Primary key:
+
+```text
+validator_address
+```
+
+Main columns:
+
+| Column | Meaning |
+|---|---|
+| `validator_address` | Validator address |
+| `validator_name` | Most recent reported name |
+| `validator_group` | Reconstructed operator identity |
+| `first_epoch` | First epoch in which the address appears |
+| `last_epoch` | Last epoch in which the address appears |
+| `names_seen` | All names observed for the address as JSON |
+
+### `validator_group_snapshots`
+
+One row per reconstructed operator identity per epoch. This table is separate from address-level snapshots, so no source observation is discarded.
+
+Primary key:
+
+```text
+(epoch_id, validator_group)
+```
+
+Stake and voting power are summed across active member addresses. Group fees are delegated-stake-weighted averages; if delegated stake is zero, an unweighted average is used.
+
+| Column | Meaning |
+|---|---|
+| `member_addresses` | Addresses active for the identity in the epoch |
+| `member_names` | Names active for the identity in the epoch |
+| `member_count` | Number of active addresses |
+| `voting_power` | Sum of member voting power |
+| `total_stake` | Sum of member total stake |
+| `own_stake` | Sum of member own stake |
+| `delegated_stake` | Sum of member delegated stake |
+| `nominal_fee` | Delegated-stake-weighted configured fee |
+| `network_effective_fee` | Weighted effective fee applied independently to each address |
+| `identity_adjusted_effective_fee` | Effective fee after applying the floor to combined identity voting power |
+| `effective_fee_rule` | `nominal` or `group_voting_power_floor` |
+
+### Effective Fee Rule
+
+The analysis uses 25 February 2026 as the policy boundary documented in IIP discussion 29. Database timestamps place the first epoch beginning after that boundary at epoch `296`.
+
+```text
+epoch < 296:  effective_fee = nominal_fee
+epoch >= 296: effective_fee = max(nominal_fee, voting_power)
+```
+
+At address level, `voting_power` is the address's voting power. In `validator_group_snapshots`, `identity_adjusted_effective_fee` uses the combined voting power of all addresses assigned to the operator. `network_effective_fee` is retained separately to show what results when the floor is applied independently to each address.
 
 ### `delegation_events`
 
@@ -449,10 +530,17 @@ python tools/ingest_delegation_events.py --start-epoch 380
 python tools/ingest_validator_actions.py --start-epoch 380
 python tools/ingest_validator_stake_object_history.py --snapshots-only
 python tools/reconstruct_ownership.py
+python tools/rebuild_validator_groups.py
 python tools/generate_analysis_outputs.py
 ```
 
 `--start-epoch` on event/action ingestion uses backward GraphQL pagination. The scripts start from the newest events and stop when pages fall below the requested epoch.
+
+To rebuild only the identity mapping, date-aware effective fees, and grouped history from existing address-level snapshots:
+
+```powershell
+python tools/rebuild_validator_groups.py
+```
 
 ### Faster Pipeline Command
 
@@ -462,6 +550,7 @@ This avoids full historical object rescanning and reuses stored complete scans:
 python tools/rebuild_database.py --start-epoch 380 --skip-owned-objects --skip-object-history
 python tools/ingest_validator_stake_object_history.py --snapshots-only
 python tools/reconstruct_ownership.py
+python tools/rebuild_validator_groups.py
 python tools/generate_analysis_outputs.py
 ```
 
@@ -497,6 +586,11 @@ Current figure filenames:
 | `18_fee_change_amount_timeline.png` | Staked/unstaked IOTA amounts around the largest fee changes, with voting power context |
 | `19_validator_stake_gini_index.png` | Gini index of total staked IOTA among validators from epoch 0 to latest |
 | `20_total_staked_iota_by_epoch.png` | Total staked IOTA from epoch 0 to latest |
+| `21_latest_validator_group_own_vs_delegated.png` | Latest-epoch own/delegated stake aggregated by operator identity |
+| `22_top5_validator_group_voting_power.png` | Combined voting power over time for the five largest validator groups |
+| `23_validator_group_stake_gini_index.png` | Gini index of total stake among reconstructed validator groups |
+| `24_pandabyte_i_stake_vp_fee.png` | PANDABYTE I delegated stake, voting power, and nominal/effective fee history |
+| `25_pandabyte_group_stake_vp_fee.png` | PANDABYTE I+II combined history and address-level versus identity-level fee floor |
 
 Generated CSV files are stored in:
 
@@ -509,6 +603,8 @@ Current CSV filenames:
 | File | Description |
 |---|---|
 | `validator_snapshots.csv` | Full export of `validator_snapshots` |
+| `validator_identities.csv` | Address-to-operator identity mapping and observed names |
+| `validator_group_snapshots.csv` | Full per-epoch validator identity aggregation |
 | `validator_actions.csv` | Full export of `validator_actions` |
 | `delegation_events.csv` | Full export of `delegation_events` |
 | `delegator_trajectory_long.csv` | Long-format delegator trajectory dataset for GBMT/R workflows |
@@ -516,7 +612,10 @@ Current CSV filenames:
 | `fee_change_event_timeline.csv` | Data behind the fee-change event timeline graph |
 | `fee_change_amount_timeline.csv` | Data behind the fee-change amount timeline graph |
 | `validator_total_stake_gini_by_epoch.csv` | Per-epoch Gini index of total validator stake |
+| `validator_group_total_stake_gini_by_epoch.csv` | Per-epoch Gini index of grouped validator stake |
 | `total_staked_iota_by_epoch.csv` | Per-epoch total staked IOTA across validators |
+| `pandabyte_i_history.csv` | Address-level data behind the PANDABYTE I case-study graph |
+| `pandabyte_group_history.csv` | Grouped data behind the PANDABYTE I+II case-study graph |
 
 ## Source File Reference
 
@@ -548,6 +647,10 @@ Creates and updates all PostgreSQL tables and indexes used by the project. Also 
 
 Pure helper logic and test target for strict event-based ownership fallback.
 
+#### `iota_stake_ownership/validator_identity.py`
+
+Defines the 25 February 2026 / epoch 296 fee-policy boundary and the pure functions used to normalize numbered validator names and reconstruct multi-address identities.
+
 ### `tools/`
 
 #### `tools/__init__.py`
@@ -560,7 +663,7 @@ Adds the repository root to `sys.path` so command-line scripts can import projec
 
 #### `tools/ingest_validator_snapshots.py`
 
-Ingests active validator snapshots from GraphQL, one epoch at a time. It writes to `validator_snapshots` using `(epoch_id, validator_address)` as the upsert key.
+Ingests active validator snapshots from GraphQL, one epoch at a time. It stores the reported validator name and nominal `commissionRate`, computes the date-aware effective fee, and writes using `(epoch_id, validator_address)` as the upsert key.
 
 #### `tools/ingest_delegation_events.py`
 
@@ -605,9 +708,13 @@ Priority order:
 1. `validator_owned_stake_snapshots`
 2. strict self-delegation event fallback
 
+#### `tools/rebuild_validator_groups.py`
+
+Reconstructs the address-to-identity mapping from the complete name history, reapplies the effective-fee policy to all address snapshots, and atomically rebuilds `validator_group_snapshots` for every epoch.
+
 #### `tools/rebuild_database.py`
 
-Pipeline wrapper that runs the main ingestion and reconstruction steps. It accepts skip flags so expensive steps can be avoided during incremental work.
+Pipeline wrapper that runs the main ingestion, ownership reconstruction, and validator-group reconstruction steps. It accepts skip flags so expensive steps can be avoided during incremental work.
 
 Useful incremental command:
 
@@ -621,7 +728,7 @@ Main output command. It exports core CSVs, generates all figures, exports top-po
 
 #### `tools/smoke_checks.py`
 
-Checks database row counts, negative delegated stake, ownership reconciliation, and optional graph generation.
+Checks database row counts, negative delegated stake, ownership reconciliation, identity coverage, grouped/address total conservation, fee-policy consistency, and optional graph generation.
 
 ### `analysis_outputs/`
 
@@ -725,11 +832,29 @@ outputs/data/validator_total_stake_gini_by_epoch.csv
 outputs/data/total_staked_iota_by_epoch.csv
 ```
 
+#### `analysis_outputs/validator_group_analysis.py`
+
+Generates the validator identity and PANDABYTE case-study outputs:
+
+```text
+21_latest_validator_group_own_vs_delegated.png
+22_top5_validator_group_voting_power.png
+23_validator_group_stake_gini_index.png
+24_pandabyte_i_stake_vp_fee.png
+25_pandabyte_group_stake_vp_fee.png
+```
+
+It also exports the grouped Gini series and both PANDABYTE histories as CSV files.
+
 ### `tests/`
 
 #### `tests/test_strict_ownership.py`
 
 Unit tests for strict event-based ownership fallback. It verifies self-stake, third-party stake, and self-unstake behavior.
+
+#### `tests/test_validator_identity.py`
+
+Unit tests for the epoch 296 fee boundary, numbered-name normalization, and conservative multi-address grouping.
 
 ### `outputs/`
 
@@ -763,6 +888,12 @@ Run ownership reconstruction:
 python tools/reconstruct_ownership.py
 ```
 
+Run validator identity and grouped-history reconstruction:
+
+```powershell
+python tools/rebuild_validator_groups.py
+```
+
 Run smoke checks:
 
 ```powershell
@@ -786,3 +917,5 @@ python tools/generate_analysis_outputs.py
 1. Public JSON-RPC nodes may prune old object versions. The code recovers many deleted stake objects from unstaking events, but a fully archival provider would be stronger for long-term exactness.
 2. `event_id = transaction digest`, so multiple event records in the same transaction cannot be stored as separate rows in `delegation_events` or `validator_actions`.
 3. Ownership attribution is strict. Separate wallets controlled by a validator are not counted as validator-owned.
+4. Identity grouping is name-based and intentionally conservative: a suffix is removed only when the same base has appeared on multiple distinct validator addresses. Operators using unrelated names require an explicit future alias mapping.
+5. Epoch 296 is the local timestamp-based interpretation of the 25 February 2026 policy date. If an authoritative protocol activation checkpoint becomes available, update `MIN_COMMISSION_ACTIVATION_EPOCH` and rebuild the groups.

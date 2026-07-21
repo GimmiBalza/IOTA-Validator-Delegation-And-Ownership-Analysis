@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from analysis_outputs.common import DATA_DIR, get_connection, save_figure, short_address
+from analysis_outputs.common import DATA_DIR, get_connection, save_figure, short_address, validator_label
 
 POOL_RANK_NAMES = ["first", "second", "third", "fourth", "fifth"]
 POOL_RANK_OUTPUT_NUMBERS = [12, 13, 14, 15, 16]
@@ -13,7 +13,7 @@ def plot_top_pool_delegators():
     print("Generating graphs 12-16: top pool delegators...")
     query = """
         WITH latest_top5 AS (
-            SELECT validator_address, pool_id, total_stake
+            SELECT validator_address, validator_name, pool_id, total_stake
             FROM validator_snapshots
             WHERE epoch_id = (SELECT MAX(epoch_id) FROM validator_snapshots)
             ORDER BY total_stake DESC
@@ -40,6 +40,7 @@ def plot_top_pool_delegators():
         )
         SELECT
             t.validator_address,
+            t.validator_name,
             t.pool_id,
             t.total_stake,
             nd.delegator_address,
@@ -67,7 +68,8 @@ def plot_top_pool_delegators():
 
         fig, ax = plt.subplots(figsize=(20, 9))
         ax.bar(x, y_m, color="#457b9d", width=0.65)
-        ax.set_title(f"Top delegatori pool {rank}: {short_address(validator)}", fontsize=16)
+        name = subset["validator_name"].iloc[0]
+        ax.set_title(f"Top delegatori pool {rank}: {validator_label(name, validator)}", fontsize=16)
         ax.set_ylabel("Milioni di IOTA delegati netti")
         ax.set_xlabel("Delegatori")
         ax.set_xticks(x)

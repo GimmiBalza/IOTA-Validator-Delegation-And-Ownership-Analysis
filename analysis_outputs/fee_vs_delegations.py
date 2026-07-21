@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from analysis_outputs.common import get_connection, save_figure, short_address
+from analysis_outputs.common import get_connection, save_figure, validator_label
 
 
 def plot_fee_vs_delegations_top_validators():
@@ -23,7 +23,8 @@ def plot_fee_vs_delegations_top_validators():
               AND delegator_address != validator_address
             GROUP BY epoch_id, validator_address
         )
-        SELECT v.epoch_id, v.validator_address, v.effective_fee, COALESCE(d.deleg_count, 0) AS num_delegations
+        SELECT v.epoch_id, v.validator_address, v.validator_name, v.effective_fee,
+               COALESCE(d.deleg_count, 0) AS num_delegations
         FROM validator_snapshots v
         JOIN top5 t ON v.validator_address = t.validator_address
         LEFT JOIN deleg_counts d ON v.epoch_id = d.epoch_id AND v.validator_address = d.validator_address
@@ -41,7 +42,8 @@ def plot_fee_vs_delegations_top_validators():
     colors = sns.color_palette("Set2", len(validators))
     for idx, addr in enumerate(validators):
         subset = df[df["validator_address"] == addr]
-        label = short_address(addr)
+        latest_name = subset["validator_name"].dropna().iloc[-1] if not subset["validator_name"].dropna().empty else None
+        label = validator_label(latest_name, addr)
         ax1.plot(subset["epoch_id"], subset["effective_fee"], label=f"Fee: {label}", color=colors[idx], linewidth=2.5)
         ax2.plot(
             subset["epoch_id"],

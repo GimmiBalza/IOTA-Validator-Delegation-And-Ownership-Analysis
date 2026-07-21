@@ -7,6 +7,7 @@ from tools.ingest_validator_owned_stake_objects import ingest_validator_owned_st
 from tools.ingest_validator_stake_object_history import ingest_validator_stake_object_history
 from tools.ingest_validator_snapshots import ingest_validator_snapshots
 from tools.reconstruct_ownership import reconstruct_ownership
+from tools.rebuild_validator_groups import rebuild_validator_groups
 
 
 def main():
@@ -42,8 +43,10 @@ def main():
         )
 
     summary = reconstruct_ownership()
+    group_summary = rebuild_validator_groups()
     print("Rebuild complete.")
     print(summary)
+    print(group_summary)
 
 
 if __name__ == "__main__":

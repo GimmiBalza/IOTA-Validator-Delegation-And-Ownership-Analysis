@@ -13,6 +13,7 @@ from analysis_outputs.stake_distribution_timeseries import plot_total_staked_iot
 from analysis_outputs.stake_fee_migration import plot_stake_and_fee_trends
 from analysis_outputs.top_pool_delegators import plot_top_pool_delegators
 from analysis_outputs.validator_wealth_delegations import plot_validator_wealth_all
+from analysis_outputs.validator_group_analysis import plot_validator_group_outputs
 
 
 def generate_all_outputs():
@@ -33,6 +34,7 @@ def generate_all_outputs():
     plot_fee_change_amount_timeline()
     plot_validator_stake_gini_index()
     plot_total_staked_iota_by_epoch()
+    plot_validator_group_outputs()
     export_delegator_gbmt_long()
     print("Tutti gli output sono stati salvati.")
 

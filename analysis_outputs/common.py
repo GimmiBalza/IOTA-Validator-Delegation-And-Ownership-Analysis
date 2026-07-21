@@ -13,11 +13,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIGURES_DIR = PROJECT_ROOT / "outputs" / "figures"
 DATA_DIR = PROJECT_ROOT / "outputs" / "data"
 
-CORE_TABLES = [
-    "validator_snapshots",
-    "validator_actions",
-    "delegation_events",
-]
+CORE_TABLES = {
+    "validator_snapshots": "epoch_id, validator_address",
+    "validator_identities": "validator_group, validator_address",
+    "validator_group_snapshots": "epoch_id, validator_group",
+    "validator_actions": None,
+    "delegation_events": None,
+}
 
 
 def configure_plots():
@@ -41,9 +43,14 @@ def short_address(address):
     return f"{address[:4]}..{address[-4:]}"
 
 
+def validator_label(name, address):
+    return name.strip() if isinstance(name, str) and name.strip() else short_address(address)
+
+
 def export_core_tables():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with get_connection() as conn:
-        for table_name in CORE_TABLES:
-            df = pd.read_sql_query(f"SELECT * FROM {table_name};", conn)
+        for table_name, order_by in CORE_TABLES.items():
+            order_clause = f" ORDER BY {order_by}" if order_by else ""
+            df = pd.read_sql_query(f"SELECT * FROM {table_name}{order_clause};", conn)
             df.to_csv(DATA_DIR / f"{table_name}.csv", index=False)

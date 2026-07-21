@@ -7,6 +7,7 @@ import _bootstrap  # noqa: F401
 from iota_stake_ownership.config import DB_PARAMS, mist_to_iota_int
 from iota_stake_ownership.graphql_client import graphql_request
 from iota_stake_ownership.schema import ensure_schema
+from iota_stake_ownership.validator_identity import effective_fee_for_epoch, fee_rule_for_epoch
 
 
 QUERY = """
@@ -25,6 +26,7 @@ query GetEpochSnapshot($epochId: Int!, $cursor: String) {
           stakingPoolId
           votingPower
           stakingPoolIotaBalance
+          commissionRate
           effectiveCommissionRate
           rewardsPool
         }
@@ -71,12 +73,13 @@ def ingest_validator_snapshots(start_epoch=0, end_epoch=None):
 
                 for val in validators:
                     val_address = val["address"]["address"]
+                    validator_name = val.get("name")
                     pool_id = val.get("stakingPoolId")
 
                     voting_power_raw = int(val.get("votingPower") or 0)
                     voting_power_pct = voting_power_raw / 100.0
 
-                    commission_raw = int(val.get("effectiveCommissionRate") or 0)
+                    commission_raw = int(val.get("commissionRate") or 0)
                     commission_pct = commission_raw / 100.0
 
                     total_stake_mist = int(val.get("stakingPoolIotaBalance") or 0)
@@ -85,31 +88,36 @@ def ingest_validator_snapshots(start_epoch=0, end_epoch=None):
                     reward_mist = int(val.get("rewardsPool") or 0)
                     reward_pool_iota = mist_to_iota_int(reward_mist)
 
-                    effective_fee = max(commission_pct, voting_power_pct)
+                    effective_fee = effective_fee_for_epoch(current_epoch, commission_pct, voting_power_pct)
+                    effective_fee_rule = fee_rule_for_epoch(current_epoch)
 
                     cursor_db.execute(
                         """
                         INSERT INTO validator_snapshots
-                            (epoch_id, validator_address, pool_id, voting_power, total_stake,
+                            (epoch_id, validator_address, validator_name, pool_id, voting_power, total_stake,
                              own_stake, delegated_stake, applied_fee, effective_fee,
-                             global_tallying_score, validator_reward)
-                        VALUES (%s, %s, %s, %s, %s, NULL, NULL, %s, %s, NULL, %s)
+                             effective_fee_rule, global_tallying_score, validator_reward)
+                        VALUES (%s, %s, %s, %s, %s, %s, NULL, NULL, %s, %s, %s, NULL, %s)
                         ON CONFLICT (epoch_id, validator_address) DO UPDATE SET
+                            validator_name = EXCLUDED.validator_name,
                             pool_id = EXCLUDED.pool_id,
                             voting_power = EXCLUDED.voting_power,
                             total_stake = EXCLUDED.total_stake,
                             applied_fee = EXCLUDED.applied_fee,
                             effective_fee = EXCLUDED.effective_fee,
+                            effective_fee_rule = EXCLUDED.effective_fee_rule,
                             validator_reward = EXCLUDED.validator_reward;
                         """,
                         (
                             current_epoch,
                             val_address,
+                            validator_name,
                             pool_id,
                             voting_power_pct,
                             total_stake,
                             commission_pct,
                             effective_fee,
+                            effective_fee_rule,
                             reward_pool_iota,
                         ),
                     )

@@ -15,16 +15,47 @@ DROP INDEX IF EXISTS idx_validator_actions_event_key;
 CREATE TABLE IF NOT EXISTS validator_snapshots (
     epoch_id INTEGER NOT NULL,
     validator_address VARCHAR NOT NULL,
+    validator_name VARCHAR,
     voting_power NUMERIC,
     total_stake BIGINT,
     own_stake BIGINT,
     delegated_stake BIGINT,
     applied_fee NUMERIC,
     effective_fee NUMERIC,
+    effective_fee_rule VARCHAR NOT NULL DEFAULT 'nominal',
     validator_reward BIGINT,
     global_tallying_score INTEGER,
     pool_id VARCHAR,
     PRIMARY KEY (epoch_id, validator_address)
+);
+
+CREATE TABLE IF NOT EXISTS validator_identities (
+    validator_address VARCHAR PRIMARY KEY,
+    validator_name VARCHAR NOT NULL,
+    validator_group VARCHAR NOT NULL,
+    first_epoch INTEGER NOT NULL,
+    last_epoch INTEGER NOT NULL,
+    names_seen JSONB NOT NULL DEFAULT '[]'::jsonb,
+    updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS validator_group_snapshots (
+    epoch_id INTEGER NOT NULL,
+    validator_group VARCHAR NOT NULL,
+    member_count INTEGER NOT NULL,
+    member_addresses VARCHAR[] NOT NULL,
+    member_names VARCHAR[] NOT NULL,
+    voting_power NUMERIC NOT NULL DEFAULT 0,
+    total_stake BIGINT NOT NULL DEFAULT 0,
+    own_stake BIGINT NOT NULL DEFAULT 0,
+    delegated_stake BIGINT NOT NULL DEFAULT 0,
+    nominal_fee NUMERIC,
+    network_effective_fee NUMERIC,
+    identity_adjusted_effective_fee NUMERIC,
+    effective_fee_rule VARCHAR NOT NULL DEFAULT 'nominal',
+    validator_reward BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (epoch_id, validator_group)
 );
 
 CREATE TABLE IF NOT EXISTS delegation_events (
@@ -127,6 +158,8 @@ ALTER TABLE validator_snapshots DROP COLUMN IF EXISTS unexplained_stake_mist;
 ALTER TABLE validator_snapshots DROP COLUMN IF EXISTS own_stake_strict;
 ALTER TABLE validator_snapshots DROP COLUMN IF EXISTS own_stake_adjusted;
 ALTER TABLE validator_snapshots DROP COLUMN IF EXISTS timelocked_stake;
+ALTER TABLE validator_snapshots ADD COLUMN IF NOT EXISTS validator_name VARCHAR;
+ALTER TABLE validator_snapshots ADD COLUMN IF NOT EXISTS effective_fee_rule VARCHAR NOT NULL DEFAULT 'nominal';
 
 ALTER TABLE delegation_events DROP COLUMN IF EXISTS tx_digest;
 ALTER TABLE delegation_events DROP COLUMN IF EXISTS event_key;
@@ -148,6 +181,12 @@ CREATE INDEX IF NOT EXISTS idx_validator_snapshots_epoch
     ON validator_snapshots(epoch_id);
 CREATE INDEX IF NOT EXISTS idx_validator_snapshots_validator
     ON validator_snapshots(validator_address, epoch_id);
+CREATE INDEX IF NOT EXISTS idx_validator_snapshots_name
+    ON validator_snapshots(validator_name, epoch_id);
+CREATE INDEX IF NOT EXISTS idx_validator_identities_group
+    ON validator_identities(validator_group, validator_address);
+CREATE INDEX IF NOT EXISTS idx_validator_group_snapshots_epoch
+    ON validator_group_snapshots(epoch_id, total_stake DESC);
 CREATE INDEX IF NOT EXISTS idx_delegation_events_validator_epoch
     ON delegation_events(validator_address, epoch_id);
 CREATE INDEX IF NOT EXISTS idx_delegation_events_delegator_epoch

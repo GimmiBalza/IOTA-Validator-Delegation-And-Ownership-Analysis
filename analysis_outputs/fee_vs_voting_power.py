@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from analysis_outputs.common import get_connection, save_figure, short_address
+from analysis_outputs.common import get_connection, save_figure, validator_label
 from analysis_outputs.stake_fee_migration import sql_in
 
 
@@ -24,7 +24,7 @@ def plot_fee_vs_voting_power_top_validators():
         if not top_addresses:
             return
         query = f"""
-            SELECT epoch_id, validator_address, effective_fee, voting_power
+            SELECT epoch_id, validator_address, validator_name, effective_fee, voting_power
             FROM validator_snapshots
             WHERE validator_address IN {sql_in(top_addresses)}
             ORDER BY epoch_id ASC;
@@ -42,7 +42,8 @@ def plot_fee_vs_voting_power_top_validators():
     colors = sns.color_palette("Set1", len(validators))
     for idx, addr in enumerate(validators):
         subset = df[df["validator_address"] == addr]
-        label = short_address(addr)
+        latest_name = subset["validator_name"].dropna().iloc[-1] if not subset["validator_name"].dropna().empty else None
+        label = validator_label(latest_name, addr)
         ax1.plot(subset["epoch_id"], subset["effective_fee"], label=f"Fee: {label}", color=colors[idx], linewidth=2.5, linestyle="--")
         ax2.plot(subset["epoch_id"], subset["voting_power"], label=f"VP: {label}", color=colors[idx], linewidth=2.5)
 

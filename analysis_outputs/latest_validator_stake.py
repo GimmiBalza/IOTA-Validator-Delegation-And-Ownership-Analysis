@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from analysis_outputs.common import get_connection, save_figure, short_address
+from analysis_outputs.common import get_connection, save_figure, validator_label
 
 
 FIXED_EPOCH_OUTPUTS = {
@@ -14,7 +14,7 @@ FIXED_EPOCH_OUTPUTS = {
 
 def fetch_validator_stake_epoch(epoch_id):
     query = """
-        SELECT validator_address, own_stake, delegated_stake, total_stake
+        SELECT validator_address, validator_name, own_stake, delegated_stake, total_stake
         FROM validator_snapshots
         WHERE epoch_id = %s
         ORDER BY total_stake DESC;
@@ -40,7 +40,10 @@ def draw_validator_stake_chart(df, epoch_id, output_filename):
         return
 
     df = df.copy()
-    df["short_addr"] = df["validator_address"].apply(short_address)
+    df["validator_label"] = df.apply(
+        lambda row: validator_label(row["validator_name"], row["validator_address"]),
+        axis=1,
+    )
     x = np.arange(len(df))
     own_m = df["own_stake"].fillna(0) / 1_000_000
     delegated_m = df["delegated_stake"].fillna(0) / 1_000_000
@@ -52,7 +55,7 @@ def draw_validator_stake_chart(df, epoch_id, output_filename):
     ax.set_title(f"Validator Pool Stake: Validator-Owned vs Delegated Stake (Epoch {epoch_id})", fontsize=18)
     ax.set_ylabel("Millions of IOTA")
     ax.set_xticks(x)
-    ax.set_xticklabels(df["short_addr"], rotation=90, fontsize=8)
+    ax.set_xticklabels(df["validator_label"], rotation=90, fontsize=8)
     ax.legend(loc="upper right")
     ax.grid(True, axis="y", color="#d0d0d0")
     ax.grid(True, axis="x", color="#d0d0d0")

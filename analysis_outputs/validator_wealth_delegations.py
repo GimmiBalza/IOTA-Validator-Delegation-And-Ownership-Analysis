@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from analysis_outputs.common import get_connection, save_figure
+from analysis_outputs.common import get_connection, save_figure, validator_label
 
 
 def plot_validator_wealth_all():
@@ -23,6 +23,7 @@ def plot_validator_wealth_all():
         )
         SELECT
             v.validator_address,
+            v.validator_name,
             v.own_stake,
             v.delegated_stake,
             v.total_stake,
@@ -37,7 +38,10 @@ def plot_validator_wealth_all():
     if df.empty:
         return
 
-    df["short_addr"] = df["validator_address"].apply(lambda x: f"{x[:4]}..{x[-4:]}")
+    df["validator_label"] = df.apply(
+        lambda row: validator_label(row["validator_name"], row["validator_address"]),
+        axis=1,
+    )
     own_m = df["own_stake"].fillna(0) / 1_000_000
     delegated_m = df["delegated_stake"].fillna(0) / 1_000_000
     counts = df["delegation_count"].fillna(0)
@@ -56,7 +60,7 @@ def plot_validator_wealth_all():
     ax2.set_ylabel("Numero Totale di Deleghe Storiche")
     ax1.set_title("Ricchezza Validatori e Numero Deleghe Ricevute (Ultima Epoca)", fontsize=16)
     ax1.set_xticks(x)
-    ax1.set_xticklabels(df["short_addr"], rotation=90, fontsize=9)
+    ax1.set_xticklabels(df["validator_label"], rotation=90, fontsize=9)
 
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()

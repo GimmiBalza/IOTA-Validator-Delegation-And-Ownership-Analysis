@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from analysis_outputs.common import get_connection, save_figure, short_address
+from analysis_outputs.common import get_connection, save_figure, validator_label
 
 
 def sql_in(values):
@@ -27,7 +27,7 @@ def plot_stake_and_fee_trends():
         if not top_addresses:
             return
         query = f"""
-            SELECT epoch_id, validator_address, delegated_stake, effective_fee
+            SELECT epoch_id, validator_address, validator_name, delegated_stake, effective_fee
             FROM validator_snapshots
             WHERE validator_address IN {sql_in(top_addresses)}
             ORDER BY epoch_id ASC;
@@ -45,7 +45,8 @@ def plot_stake_and_fee_trends():
 
     for idx, addr in enumerate(validators):
         subset = df_top5[df_top5["validator_address"] == addr]
-        label = short_address(addr)
+        latest_name = subset["validator_name"].dropna().iloc[-1] if not subset["validator_name"].dropna().empty else None
+        label = validator_label(latest_name, addr)
         ax1.plot(subset["epoch_id"], subset["delegated_m"], label=f"Stake: {label}", color=colors[idx], linewidth=2.5)
         ax2.plot(
             subset["epoch_id"],
